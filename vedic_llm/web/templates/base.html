@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Vedic Chart Analysis{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1f2530;
+      --text: #e6e8ef;
+      --muted: #9aa3b4;
+      --accent: #e8b04b;
+      --accent-2: #7aa2f7;
+      --border: #2a3142;
+      --ok: #8fd17a;
+      --warn: #f0a14a;
+      --err: #ef6f6f;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+                 font-family: -apple-system, "SF Pro Text", "Inter", Segoe UI, Roboto, system-ui, sans-serif;
+                 font-size: 15px; line-height: 1.55; }
+    a { color: var(--accent-2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header {
+      padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--panel);
+    }
+    header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; letter-spacing: 0.3px; }
+    header nav a { margin-left: 1rem; font-size: 0.9rem; color: var(--muted); }
+    main { max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1.5rem; margin-bottom: 1.5rem;
+    }
+    h2 { margin-top: 0; font-size: 1.05rem; color: var(--accent); letter-spacing: 0.3px;
+         font-weight: 600; text-transform: uppercase; }
+    h3 { font-size: 1rem; margin: 1.2rem 0 0.5rem; color: var(--text); }
+    label { display: block; margin: 0.7rem 0 0.25rem; color: var(--muted); font-size: 0.9rem; }
+    input[type="text"], input[type="date"], input[type="time"], input[type="number"], select {
+      width: 100%; padding: 0.6rem 0.8rem;
+      background: var(--panel-2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      font-size: 0.95rem; font-family: inherit;
+    }
+    input:focus { outline: none; border-color: var(--accent-2); }
+    .row { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    button, .btn {
+      margin-top: 1.3rem; padding: 0.7rem 1.4rem;
+      background: var(--accent); color: #1a1a1a; border: 0;
+      font-weight: 600; font-size: 0.95rem;
+      border-radius: 6px; cursor: pointer;
+    }
+    button:hover { background: #f2bd5c; }
+    .checkbox { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0 0; }
+    .checkbox input { width: auto; }
+    .checkbox label { display: inline; margin: 0; }
+    .error { background: rgba(239,111,111,0.15); border: 1px solid var(--err);
+             color: var(--err); padding: 0.8rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    .notice { background: rgba(240,161,74,0.12); border: 1px solid var(--warn);
+              color: var(--warn); padding: 0.8rem 1rem; border-radius: 6px; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.9rem; }
+    th, td { padding: 0.55rem 0.7rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.4px; }
+    tr:last-child td { border-bottom: none; }
+    .pill { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px;
+            font-size: 0.78rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
+    .pill.ok { color: var(--ok); border-color: var(--ok); }
+    .pill.warn { color: var(--warn); border-color: var(--warn); }
+    .pill.accent { color: var(--accent); border-color: var(--accent); }
+    .score-cell { font-weight: 600; color: var(--accent); }
+    ul.tight { margin: 0.3rem 0; padding-left: 1.2rem; }
+    ul.tight li { margin: 0.2rem 0; }
+    .muted { color: var(--muted); font-size: 0.88rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+    .headline { font-size: 1.05rem; color: var(--accent-2); font-style: italic;
+                border-left: 3px solid var(--accent-2); padding: 0.3rem 0 0.3rem 1rem; margin: 0.5rem 0; }
+    details { margin: 0.6rem 0; }
+    summary { cursor: pointer; padding: 0.3rem 0; color: var(--accent-2); font-weight: 500; }
+    code { background: var(--panel-2); padding: 0.1rem 0.4rem; border-radius: 4px;
+           font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 0.88em; }
+    footer { margin-top: 3rem; padding: 1.5rem; text-align: center; color: var(--muted); font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Vedic Chart Analysis</h1>
+  <nav>
+    <a href="/">New chart</a>
+    <a href="/health">Health</a>
+  </nav>
+</header>
+<main>
+  {% block content %}{% endblock %}
+</main>
+<footer>
+  <p>Python computes. Claude interprets. Not financial or medical advice.</p>
+</footer>
+</body>
+</html>

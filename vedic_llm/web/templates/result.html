@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}Chart — {{ slug }}{% endblock %}
+{% block content %}
+
+{% if notice %}<div class="notice">{{ notice }}</div>{% endif %}
+
+<div class="panel">
+  <h2>Birth Details</h2>
+  <table>
+    <tr><th>UTC</th><td>{{ birth.datetime_utc }}</td></tr>
+    <tr><th>Place</th><td>{{ birth.place }}</td></tr>
+    <tr><th>Coordinates</th><td>{{ birth.latitude }}, {{ birth.longitude }}</td></tr>
+    <tr><th>Timezone</th><td>{{ birth.timezone }}</td></tr>
+    <tr><th>Slug</th><td><code>{{ slug }}</code></td></tr>
+  </table>
+  <p class="muted">
+    <a href="/api/chart/{{ slug }}">Chart JSON</a>
+    · <a href="/api/report/{{ slug }}">Full report JSON</a>
+  </p>
+</div>
+
+<div class="panel">
+  <h2>Chart Summary</h2>
+  <div class="grid-2">
+    <div>
+      <h3>Ascendant</h3>
+      <p>
+        <strong>{{ ascendant.sign }}</strong>
+        {{ "%.2f"|format(ascendant.degree) }}° —
+        {{ ascendant.nakshatra }} pada {{ ascendant.pada }}<br>
+        <span class="muted">Nakshatra lord:</span> {{ ascendant.nakshatra_lord }}
+        ({{ ascendant.nakshatra_lord_sign }}, house {{ ascendant.nakshatra_lord_house }})<br>
+        <span class="muted">Lagna lord:</span> {{ ascendant.lagna_lord }}
+      </p>
+
+      <h3>Key Roles</h3>
+      <p>
+        <span class="muted">Atmakaraka:</span> <span class="pill accent">{{ atmakaraka }}</span>
+        <span class="muted" style="margin-left:0.8rem">Amatyakaraka:</span>
+        <span class="pill">{{ amatyakaraka }}</span><br>
+        <span class="muted">Vargottama:</span>
+        {% for v in vargottama %}<span class="pill ok">{{ v }}</span>{% else %}—{% endfor %}
+      </p>
+
+      <h3>Functional Natures</h3>
+      <p>
+        <span class="muted">Benefics:</span>
+        {% for p in functional_benefics %}<span class="pill ok">{{ p }}</span>{% endfor %}<br>
+        <span class="muted">Malefics:</span>
+        {% for p in functional_malefics %}<span class="pill warn">{{ p }}</span>{% endfor %}
+      </p>
+    </div>
+
+    <div>
+      <h3>D9 (Navamsa)</h3>
+      <p>
+        <strong>{{ d9_ascendant }}</strong>
+        {% if d9_ascendant_nakshatra %} — {{ d9_ascendant_nakshatra }}{% endif %}
+      </p>
+
+      <h3>Yogas</h3>
+      {% if yogas %}
+        <ul class="tight">
+          {% for y in yogas %}
+            <li><strong>{{ y.name }}</strong>
+              <span class="pill">{{ y.strength }}</span>
+              <span class="muted">— {{ y.planets|join(", ") }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="muted">No yogas detected.</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>Planet Positions</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Planet</th><th>Sign</th><th>Degree</th><th>House</th>
+        <th>Nakshatra</th><th>Dignity</th><th>Functional</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name in ["Sun","Moon","Mars","Mercury","Jupiter","Venus","Saturn","Rahu","Ketu"] %}
+        {% set p = planets[name] %}
+        <tr>
+          <td><strong>{{ name }}</strong></td>
+          <td>{{ p.sign }}</td>
+          <td>{{ p.degree }}</td>
+          <td>{{ p.house }}</td>
+          <td>{{ p.nakshatra }} p{{ p.pada }}</td>
+          <td>
+            {{ p.dignity }}
+            {% if p.natural_dignity and p.natural_dignity != p.dignity %}
+              <span class="muted">/ nat {{ p.natural_dignity }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.functional_nature == "benefic" or p.functional_nature == "yogakaraka" %}
+              <span class="pill ok">{{ p.functional_nature }}</span>
+            {% elif p.functional_nature == "malefic" or p.functional_nature == "maraka" %}
+              <span class="pill warn">{{ p.functional_nature }}</span>
+            {% else %}
+              <span class="pill">{{ p.functional_nature }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.retrograde %}<span class="pill warn">R</span>{% endif %}
+            {% if p.combust %}<span class="pill warn">C</span>{% endif %}
+            {% if p.vargottama %}<span class="pill ok">V</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="panel">
+  <h2>Houses</h2>
+  <table>
+    <thead>
+      <tr><th>#</th><th>Sign</th><th>Lord</th><th>Occupants</th><th>Aspected By</th></tr>
+    </thead>
+    <tbody>
+      {% for n in range(1, 13) %}
+        {% set h = houses[n] %}
+        <tr>
+          <td><strong>{{ n }}</strong></td>
+          <td>{{ h.sign }}</td>
+          <td>{{ h.lord }}
+            {% if h.lord_dignity %}<span class="muted">({{ h.lord_dignity }}, h{{ h.lord_house }})</span>{% endif %}
+          </td>
+          <td>{{ h.occupants|join(", ") or "—" }}</td>
+          <td>{{ h.aspected_by|join(", ") or "—" }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if has_quick %}
+<div class="panel">
+  <h2>Quick Analysis — 12-House Overview</h2>
+  {% set ov = quick.overview %}
+  {% if ov %}
+    {% if ov.headline %}<div class="headline">{{ ov.headline }}</div>{% endif %}
+    {% if ov.lagna_snapshot %}
+      <h3>Lagna</h3><p>{{ ov.lagna_snapshot }}</p>
+    {% endif %}
+    {% if ov.atmakaraka_note %}
+      <h3>Atmakaraka</h3><p>{{ ov.atmakaraka_note }}</p>
+    {% endif %}
+    {% if ov.d9_qualification %}
+      <h3>D9 cross-check</h3><p>{{ ov.d9_qualification }}</p>
+    {% endif %}
+
+    <div class="grid-2">
+      {% if ov.top_strengths %}
+        <div>
+          <h3>Top strengths</h3>
+          <ul class="tight">{% for s in ov.top_strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      {% if ov.top_vulnerabilities %}
+        <div>
+          <h3>Top vulnerabilities</h3>
+          <ul class="tight">{% for s in ov.top_vulnerabilities %}<li>{{ s }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      {% if ov.key_yogas %}
+        <div>
+          <h3>Key yogas</h3>
+          <ul class="tight">{% for s in ov.key_yogas %}<li>{{ s }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+      {% if ov.structural_pillars %}
+        <div>
+          <h3>Structural pillars</h3>
+          <ul class="tight">{% for s in ov.structural_pillars %}<li>{{ s }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if quick.houses %}
+    <h3>Per-house snapshot</h3>
+    <table>
+      <thead>
+        <tr><th>#</th><th>Topic</th><th>Score</th><th>Snapshot</th></tr>
+      </thead>
+      <tbody>
+        {% for n in range(1, 13) %}
+          {% set h = quick.houses[n|string] %}
+          {% if h %}
+          <tr>
+            <td><strong>{{ n }}</strong></td>
+            <td>{{ h.topic }}</td>
+            <td class="score-cell">{{ h.score }}/10</td>
+            <td>{{ h.snapshot }}</td>
+          </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% for n in range(1, 13) %}
+      {% set h = quick.houses[n|string] %}
+      {% if h %}
+        <details>
+          <summary>House {{ n }} — {{ h.topic }} (Score: {{ h.score }}/10)</summary>
+          <p>{{ h.snapshot }}</p>
+          {% if h.strengths %}
+            <strong>Strengths:</strong>
+            <ul class="tight">{% for s in h.strengths %}<li>{{ s }}</li>{% endfor %}</ul>
+          {% endif %}
+          {% if h.weaknesses %}
+            <strong>Weaknesses:</strong>
+            <ul class="tight">{% for s in h.weaknesses %}<li>{{ s }}</li>{% endfor %}</ul>
+          {% endif %}
+        </details>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% if quick.top_priorities %}
+    <h3>Top priorities</h3>
+    <ul class="tight">
+      {% for p in quick.top_priorities %}<li>{{ p }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if quick_tokens %}
+    <p class="muted">
+      Tokens — in: {{ quick_tokens.input_tokens }}, out: {{ quick_tokens.output_tokens }}.
+    </p>
+  {% endif %}
+</div>
+{% else %}
+<div class="panel">
+  <h2>Quick Analysis</h2>
+  <p class="muted">No LLM analysis has been run for this chart yet.</p>
+  <form method="post" action="/analyze" style="display:inline">
+    <input type="hidden" name="date" value="{{ birth.datetime_utc.split(' ')[0] }}">
+    <p class="muted">Re-submit from the <a href="/">form</a> with the "Run analysis" checkbox enabled, or use the CLI: <code>vedic quick-analysis --chart-file reports/chart_{{ slug }}.json</code>.</p>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

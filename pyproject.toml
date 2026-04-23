@@ -16,6 +16,14 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov", "ruff", "mypy"]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "geopy>=2.4",
+    "timezonefinder>=6.5",
+]
 
 [project.scripts]
 vedic = "vedic_llm.cli:app"

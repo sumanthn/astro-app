@@ -9,7 +9,15 @@ from datetime import datetime
 from vedic_llm.models.chart import Chart, BirthData
 from vedic_llm.models.enums import Planet, Sign, Dignity
 from vedic_llm.models.dossier import NatalDossier, PlanetFacts, HouseFacts
-from vedic_llm.compute.dignity import SIGN_LORD, EXALTATION
+from vedic_llm.compute.dignity import (
+    SIGN_LORD,
+    EXALTATION,
+    NATURAL_FRIENDS,
+    natural_dignity,
+    functional_nature,
+    houses_ruled_by,
+)
+from vedic_llm.models.chart import PlanetState
 from vedic_llm.compute.aspects import aspects_cast_by, populate_house_aspects
 from vedic_llm.compute.yogas import detect_yogas, papa_kartari, shubha_kartari
 
@@ -52,13 +60,141 @@ def _karaka_state(planet: Planet, chart: Chart) -> str:
 
 
 def _functional_nature(planet: Planet, asc_sign: Sign) -> str:
-    """Simplified functional nature for a planet given the ascendant."""
-    yk = YOGAKARAKAS.get(asc_sign)
-    if yk and planet == yk:
-        return "yogakaraka"
-    # Kendra lords (1,4,7,10) and trikona lords (1,5,9) are generally benefic
-    # Dusthana lords (6,8,12) are generally malefic
-    # This is a simplification
+    """Parashari functional nature — delegates to compute.dignity."""
+    return functional_nature(planet, asc_sign)
+
+
+def _nakshatra_from_degree(lon: float):
+    """Return (Nakshatra, pada) for a sidereal longitude — inline duplicate of
+    chart._nakshatra_from_longitude to avoid importing a private helper."""
+    from vedic_llm.models.enums import Nakshatra
+    nak_span = 360.0 / 27.0
+    pada_span = nak_span / 4.0
+    nak_index = min(int(lon / nak_span), 26)
+    offset = lon - nak_index * nak_span
+    pada = min(int(offset / pada_span) + 1, 4)
+    return Nakshatra(nak_index + 1), pada
+
+
+def _house_from(asc_sign: Sign, planet_sign: Sign) -> int:
+    """Whole-sign house number of *planet_sign* when *asc_sign* is the 1st house."""
+    return ((planet_sign.value - asc_sign.value) % 12) + 1
+
+
+def _alternate_lagna_view(chart: Chart, lagna_planet: Planet) -> dict:
+    """Return per-planet houses when *lagna_planet*'s sign is treated as 1st house.
+    Used for Chandra Lagna (Moon) and Surya Lagna (Sun) cross-checks."""
+    ps = chart.planets.get(lagna_planet)
+    if not ps:
+        return {}
+    lagna_sign = ps.sign
+    planet_houses = {}
+    occupants_by_house = {i: [] for i in range(1, 13)}
+    for p, pstate in chart.planets.items():
+        h = _house_from(lagna_sign, pstate.sign)
+        planet_houses[p.value] = h
+        occupants_by_house[h].append(p.value)
+    # Which sign lands on each house and which planet lords it
+    houses_map = {}
+    for h in range(1, 13):
+        sign_num = ((lagna_sign.value - 1 + h - 1) % 12) + 1
+        s = Sign(sign_num)
+        houses_map[h] = {
+            "sign": s.name.title(),
+            "lord": SIGN_LORD[s].value,
+            "occupants": occupants_by_house[h],
+        }
+    return {
+        "lagna_planet": lagna_planet.value,
+        "lagna_sign": lagna_sign.name.title(),
+        "planet_houses": planet_houses,
+        "houses": houses_map,
+    }
+
+
+def _d9_full(d9: Chart, atmakaraka: Planet, d1: Chart) -> dict:
+    """Rich D9 summary: asc, asc-lord placement, every planet's D9 state,
+    a 12-house map, karakamsha, and vargottama planets."""
+    populate_house_aspects(d9)
+    asc = d9.ascendant_sign
+    asc_lord = SIGN_LORD[asc]
+    asc_lord_state = d9.planets.get(asc_lord)
+    asc_nak, asc_pada = _nakshatra_from_degree(d9.ascendant_degree + (asc.value - 1) * 30)
+
+    planets_d9 = {}
+    for p, ps in d9.planets.items():
+        planets_d9[p.value] = {
+            "sign": ps.sign.name.title(),
+            "house_from_d9_lagna": ps.house,
+            "dignity": ps.dignity.value,
+            "natural_dignity": natural_dignity(p, ps.sign, ps.degree_in_sign).value,
+            "conjunctions": [op.value for op, ops in d9.planets.items()
+                             if op != p and ops.house == ps.house],
+            "aspects_cast_on_houses": aspects_cast_by(p, ps.house),
+        }
+
+    houses_d9 = {}
+    for h_num, house in d9.houses.items():
+        lord = house.lord
+        lord_ps = d9.planets.get(lord)
+        houses_d9[h_num] = {
+            "sign": house.sign.name.title(),
+            "lord": lord.value,
+            "lord_sign": lord_ps.sign.name.title() if lord_ps else "",
+            "lord_house": lord_ps.house if lord_ps else 0,
+            "lord_dignity": lord_ps.dignity.value if lord_ps else "",
+            "occupants": [p.value for p in house.occupants],
+            "aspected_by": [p.value for p in house.aspected_by],
+        }
+
+    ak_d9 = d9.planets.get(atmakaraka)
+    d1_lagna_lord = SIGN_LORD[d1.ascendant_sign]
+    d1_lagna_lord_d9 = d9.planets.get(d1_lagna_lord)
+
+    return {
+        "ascendant": asc.name.title(),
+        "ascendant_degree": round(d9.ascendant_degree, 2),
+        "ascendant_nakshatra": asc_nak.name.replace("_", " ").title(),
+        "ascendant_pada": asc_pada,
+        "ascendant_lord": asc_lord.value,
+        "ascendant_lord_in_d9": {
+            "sign": asc_lord_state.sign.name.title() if asc_lord_state else "",
+            "house": asc_lord_state.house if asc_lord_state else 0,
+            "dignity": asc_lord_state.dignity.value if asc_lord_state else "",
+        },
+        "d1_lagna_lord_in_d9": {
+            "planet": d1_lagna_lord.value,
+            "sign": d1_lagna_lord_d9.sign.name.title() if d1_lagna_lord_d9 else "",
+            "house_from_d9_lagna": d1_lagna_lord_d9.house if d1_lagna_lord_d9 else 0,
+            "dignity": d1_lagna_lord_d9.dignity.value if d1_lagna_lord_d9 else "",
+        },
+        "karakamsha": {
+            "planet": atmakaraka.value,
+            "sign": ak_d9.sign.name.title() if ak_d9 else "",
+            "house_from_d9_lagna": ak_d9.house if ak_d9 else 0,
+            "dignity": ak_d9.dignity.value if ak_d9 else "",
+        },
+        "planets": planets_d9,
+        "houses": houses_d9,
+        "moon_in_d9_house": d9.planets[Planet.MOON].house if Planet.MOON in d9.planets else 0,
+        "sun_in_d9_house": d9.planets[Planet.SUN].house if Planet.SUN in d9.planets else 0,
+    }
+
+
+def _natural_relation_to_sign_lord(planet: Planet, sign: Sign) -> str:
+    """Return 'own' / 'friend' / 'neutral' / 'enemy' for planet in this sign."""
+    lord = SIGN_LORD[sign]
+    if planet == lord:
+        return "own"
+    if planet in (Planet.RAHU, Planet.KETU) or lord in (Planet.RAHU, Planet.KETU):
+        return "neutral"
+    info = NATURAL_FRIENDS.get(planet)
+    if not info:
+        return "neutral"
+    if lord in info["friends"]:
+        return "friend"
+    if lord in info["enemies"]:
+        return "enemy"
     return "neutral"
 
 
@@ -112,6 +248,9 @@ def extract_natal_dossier(d1: Chart, d9: Chart, d10: Chart) -> NatalDossier:
             nakshatra=ps.nakshatra.name.replace("_", " ").title(),
             pada=ps.pada,
             dignity=ps.dignity.value,
+            natural_dignity=natural_dignity(planet, ps.sign, ps.degree_in_sign).value,
+            sign_lord=SIGN_LORD[ps.sign].value,
+            natural_relation_to_sign_lord=_natural_relation_to_sign_lord(planet, ps.sign),
             retrograde=ps.retrograde,
             combust=ps.combust,
             vargottama=ps.vargottama,
@@ -141,6 +280,10 @@ def extract_natal_dossier(d1: Chart, d9: Chart, d10: Chart) -> NatalDossier:
             lord_sign=lord_ps.sign.name.title() if lord_ps else "",
             lord_house=lord_ps.house if lord_ps else 0,
             lord_dignity=lord_ps.dignity.value if lord_ps else "",
+            lord_natural_dignity=(
+                natural_dignity(lord, lord_ps.sign, lord_ps.degree_in_sign).value
+                if lord_ps else ""
+            ),
             lord_is_combust=lord_ps.combust if lord_ps else False,
             lord_is_retrograde=lord_ps.retrograde if lord_ps else False,
             occupants=[p.value for p in house.occupants],
@@ -164,18 +307,38 @@ def extract_natal_dossier(d1: Chart, d9: Chart, d10: Chart) -> NatalDossier:
     ak = _atmakaraka(d1)
     amk = _amatyakaraka(d1)
 
-    # D9 summary
-    d9_summary = {
-        "ascendant": d9.ascendant_sign.name.title(),
-        "ascendant_degree": round(d9.ascendant_degree, 2),
-    }
+    # Full D9 picture — asc, asc-lord, every planet, every house, karakamsha
+    d9_summary = _d9_full(d9, ak, d1)
 
-    # Functional benefics/malefics (simplified)
-    func_benefics = []
-    func_malefics = []
-    yk = YOGAKARAKAS.get(asc)
-    if yk:
-        func_benefics.append(yk.value)
+    # Functional natures — classical Parashari rules
+    func_natures = {p.value: functional_nature(p, asc)
+                    for p in [Planet.SUN, Planet.MOON, Planet.MARS, Planet.MERCURY,
+                              Planet.JUPITER, Planet.VENUS, Planet.SATURN,
+                              Planet.RAHU, Planet.KETU]}
+    func_benefics = [p for p, n in func_natures.items() if n == "benefic"]
+    func_malefics = [p for p, n in func_natures.items() if n == "malefic"]
+    func_neutrals = [p for p, n in func_natures.items() if n in ("neutral", "maraka")]
+    yogakarakas = [p for p, n in func_natures.items() if n == "yogakaraka"]
+
+    # Ascendant nakshatra from the sidereal longitude
+    asc_lon_absolute = (asc.value - 1) * 30 + d1.ascendant_degree
+    asc_nak, asc_pada = _nakshatra_from_degree(asc_lon_absolute)
+    nak_lord = asc_nak.lord
+    nak_lord_ps = d1.planets.get(nak_lord)
+
+    asc_dict = {
+        "sign": asc.name.title(),
+        "degree": round(d1.ascendant_degree, 2),
+        "nakshatra": asc_nak.name.replace("_", " ").title(),
+        "pada": asc_pada,
+        "nakshatra_lord": nak_lord.value,
+        "nakshatra_lord_sign": nak_lord_ps.sign.name.title() if nak_lord_ps else "",
+        "nakshatra_lord_house": nak_lord_ps.house if nak_lord_ps else 0,
+        "nakshatra_lord_dignity": nak_lord_ps.dignity.value if nak_lord_ps else "",
+        "lagna_lord": SIGN_LORD[asc].value,
+        "is_hemmed_by_malefics": papa_kartari(d1, 1),
+        "is_hemmed_by_benefics": shubha_kartari(d1, 1),
+    }
 
     return NatalDossier(
         birth={
@@ -185,10 +348,7 @@ def extract_natal_dossier(d1: Chart, d9: Chart, d10: Chart) -> NatalDossier:
             "longitude": d1.birth.longitude,
             "timezone": d1.birth.timezone,
         },
-        ascendant={
-            "sign": asc.name.title(),
-            "degree": round(d1.ascendant_degree, 2),
-        },
+        ascendant=asc_dict,
         planets=planets_facts,
         houses=houses_facts,
         yogas=[{"name": y.name, "planets": [p.value for p in y.planets_involved],
@@ -200,5 +360,10 @@ def extract_natal_dossier(d1: Chart, d9: Chart, d10: Chart) -> NatalDossier:
         amatyakaraka=amk.value,
         functional_benefics=func_benefics,
         functional_malefics=func_malefics,
+        functional_neutrals=func_neutrals,
+        yogakarakas=yogakarakas,
+        functional_natures=func_natures,
         d9_summary=d9_summary,
+        chandra_lagna=_alternate_lagna_view(d1, Planet.MOON),
+        surya_lagna=_alternate_lagna_view(d1, Planet.SUN),
     )

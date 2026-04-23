@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="panel">
+  <h2>Birth Details</h2>
+  <p class="muted">Enter the native's date, time, and place of birth. A place name is enough — the server geocodes it and auto-detects the timezone. You can override any field.</p>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/analyze">
+    <div class="row">
+      <div>
+        <label for="date">Date of birth</label>
+        <input id="date" name="date" type="date" required
+               value="{{ form_values.date if form_values else '' }}">
+      </div>
+      <div>
+        <label for="time">Time of birth (24hr)</label>
+        <input id="time" name="time" type="time" required
+               value="{{ form_values.time if form_values else '' }}">
+      </div>
+    </div>
+
+    <label for="place">Place of birth</label>
+    <input id="place" name="place" type="text" placeholder="Bangalore, India"
+           value="{{ form_values.place if form_values else '' }}">
+    <p class="muted">If left blank, you must supply latitude and longitude below.</p>
+
+    <details>
+      <summary>Advanced — override lat/lon/timezone</summary>
+      <div class="row">
+        <div>
+          <label for="latitude">Latitude</label>
+          <input id="latitude" name="latitude" type="text" placeholder="(auto from place)"
+                 value="{{ form_values.latitude if form_values else '' }}">
+        </div>
+        <div>
+          <label for="longitude">Longitude</label>
+          <input id="longitude" name="longitude" type="text" placeholder="(auto from place)"
+                 value="{{ form_values.longitude if form_values else '' }}">
+        </div>
+      </div>
+      <label for="timezone">Timezone (IANA, e.g. <code>Asia/Kolkata</code>)</label>
+      <input id="timezone" name="timezone" type="text" placeholder="(auto from coordinates)"
+             value="{{ form_values.timezone if form_values else '' }}">
+    </details>
+
+    <label for="name">Chart label (optional)</label>
+    <input id="name" name="name" type="text" placeholder="e.g. ravi — used in the URL"
+           value="{{ form_values.name if form_values else '' }}">
+
+    <div class="checkbox">
+      <input id="run_analysis" name="run_analysis" type="checkbox" value="1" checked>
+      <label for="run_analysis">Run a quick 12-house LLM analysis after computing (costs API tokens)</label>
+    </div>
+
+    <button type="submit">Compute chart &amp; analyse</button>
+  </form>
+</div>
+{% endblock %}

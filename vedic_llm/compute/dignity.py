@@ -160,6 +160,99 @@ def _combined_relationship(natural: str, temporary: str) -> Dignity:
     return combo.get((natural, temporary), Dignity.NEUTRAL)
 
 
+_KENDRA = {1, 4, 7, 10}
+_TRIKONA = {1, 5, 9}
+_DUSTHANA = {6, 8, 12}
+_MARAKA = {2, 7}
+_NATURAL_BENEFICS = {Planet.JUPITER, Planet.VENUS, Planet.MERCURY, Planet.MOON}
+
+
+def houses_ruled_by(planet: Planet, asc_sign: Sign) -> list[int]:
+    """Return the 1-indexed whole-sign houses lorded by *planet* from *asc_sign*."""
+    if planet in (Planet.RAHU, Planet.KETU):
+        return []
+    result = []
+    for h in range(1, 13):
+        sign_num = ((asc_sign.value - 1 + h - 1) % 12) + 1
+        if SIGN_LORD[Sign(sign_num)] == planet:
+            result.append(h)
+    return result
+
+
+def functional_nature(planet: Planet, asc_sign: Sign) -> str:
+    """Classical Parashari functional nature.
+
+    Returns one of: 'yogakaraka', 'benefic', 'malefic', 'maraka', 'neutral'.
+    Rahu/Ketu are always 'malefic' (shadowy).
+    """
+    if planet in (Planet.RAHU, Planet.KETU):
+        return "malefic"
+
+    houses = set(houses_ruled_by(planet, asc_sign))
+    if not houses:
+        return "neutral"
+
+    owns_non1_kendra = bool(houses & (_KENDRA - {1}))
+    owns_non1_trikona = bool(houses & (_TRIKONA - {1}))
+    owns_dusthana = bool(houses & _DUSTHANA)
+    owns_lagna = 1 in houses
+
+    if owns_non1_kendra and owns_non1_trikona:
+        return "yogakaraka"
+    if owns_non1_trikona:
+        return "benefic"  # trikona dominates dusthana
+    if owns_lagna:
+        return "benefic"  # lagna lord exception
+    if owns_non1_kendra:
+        # kendradhipati dosha: natural benefics owning only kendras = neutral
+        return "neutral" if planet in _NATURAL_BENEFICS else "benefic"
+    if owns_dusthana:
+        return "malefic"
+    if houses <= _MARAKA:
+        return "maraka"
+    return "neutral"
+
+
+def natural_dignity(planet: Planet, sign: Sign, degree: float) -> Dignity:
+    """Dignity using natural friendship only — ignores temporary (house-based) override.
+
+    Many practitioners weight the natural reading more heavily than Parashara's
+    combined Panchadha Maitri. Exposing both lets the LLM see when a planet sits
+    in an enemy sign that the combined scheme softens to Neutral.
+    """
+    if planet == Planet.RAHU:
+        if sign in (Sign.TAURUS, Sign.GEMINI):
+            return Dignity.EXALTED
+        if sign in (Sign.SCORPIO, Sign.SAGITTARIUS):
+            return Dignity.DEBILITATED
+        return Dignity.NEUTRAL
+    if planet == Planet.KETU:
+        if sign in (Sign.SCORPIO, Sign.SAGITTARIUS):
+            return Dignity.EXALTED
+        if sign in (Sign.TAURUS, Sign.GEMINI):
+            return Dignity.DEBILITATED
+        return Dignity.NEUTRAL
+
+    if planet in EXALTATION and sign == EXALTATION[planet][0]:
+        return Dignity.EXALTED
+    if planet in DEBILITATION and sign == DEBILITATION[planet]:
+        return Dignity.DEBILITATED
+    if planet in MOOLATRIKONA:
+        mt_sign, mt_start, mt_end = MOOLATRIKONA[planet]
+        if sign == mt_sign and mt_start <= degree <= mt_end:
+            return Dignity.MOOLATRIKONA
+    if planet in OWN_SIGNS and sign in OWN_SIGNS[planet]:
+        return Dignity.OWN
+
+    sign_lord = SIGN_LORD[sign]
+    rel = _natural_relationship(planet, sign_lord)
+    if rel == "friend":
+        return Dignity.FRIEND
+    if rel == "enemy":
+        return Dignity.ENEMY
+    return Dignity.NEUTRAL
+
+
 def compute_dignity(planet: Planet, sign: Sign, degree: float, chart: 'Chart') -> Dignity:
     """Compute the dignity of a planet in a given sign and degree.
 

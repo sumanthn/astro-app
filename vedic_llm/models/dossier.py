@@ -15,7 +15,10 @@ class PlanetFacts(BaseModel):
     house: int
     nakshatra: str
     pada: int
-    dignity: str
+    dignity: str  # combined Panchadha Maitri (natural + temporary)
+    natural_dignity: str  # natural-only, ignoring temporary friendship
+    sign_lord: str
+    natural_relation_to_sign_lord: str  # "own", "friend", "neutral", "enemy"
     retrograde: bool
     combust: bool
     vargottama: bool
@@ -36,7 +39,8 @@ class HouseFacts(BaseModel):
     lord: str
     lord_sign: str
     lord_house: int
-    lord_dignity: str
+    lord_dignity: str  # combined
+    lord_natural_dignity: str  # natural-only
     lord_is_combust: bool
     lord_is_retrograde: bool
     occupants: list[str]
@@ -59,7 +63,12 @@ class NatalDossier(BaseModel):
     amatyakaraka: str
     functional_benefics: list[str]
     functional_malefics: list[str]
+    functional_neutrals: list[str] = []
+    yogakarakas: list[str] = []
+    functional_natures: dict[str, str] = {}  # planet -> nature label
     d9_summary: dict
+    chandra_lagna: dict = {}  # view with Moon as ascendant
+    surya_lagna: dict = {}  # view with Sun as ascendant
 
 
 class DashaDossier(BaseModel):
