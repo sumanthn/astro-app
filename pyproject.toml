@@ -1,0 +1,28 @@
+[project]
+name = "vedic_llm"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "skyfield>=1.45",
+    "pydantic>=2.5",
+    "anthropic>=0.40",
+    "typer>=0.12",
+    "rich>=13.7",
+    "python-dateutil>=2.8",
+    "pytz>=2024.1",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov", "ruff", "mypy"]
+
+[project.scripts]
+vedic = "vedic_llm.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["vedic_llm*"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

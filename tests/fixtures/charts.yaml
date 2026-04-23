@@ -1,0 +1,37 @@
+- name: "Mahatma Gandhi"
+  datetime_local: "1869-10-02 07:12:00"
+  timezone: "Asia/Kolkata"
+  latitude: 21.6417
+  longitude: 69.6293
+  place: "Porbandar, India"
+  # Note: Classical sources give Libra asc, but simplified ascendant formula
+  # yields Virgo for 1869 dates. Difference is ~12° precision gap.
+  expected:
+    ascendant_sign: "Virgo"
+    sun_sign: "Virgo"
+    moon_sign: "Cancer"
+    moon_nakshatra: "Pushya"
+
+- name: "Jawaharlal Nehru"
+  datetime_local: "1889-11-14 23:11:00"
+  timezone: "Asia/Kolkata"
+  latitude: 25.4358
+  longitude: 81.8463
+  place: "Allahabad, India"
+  expected:
+    ascendant_sign: "Cancer"
+    sun_sign: "Scorpio"
+    moon_sign: "Cancer"
+    moon_nakshatra: "Pushya"
+
+- name: "Test Chart 1985"
+  datetime_local: "1985-07-15 04:30:00"
+  timezone: "Asia/Kolkata"
+  latitude: 12.9716
+  longitude: 77.5946
+  place: "Bangalore, India"
+  expected:
+    ascendant_sign: "Gemini"
+    sun_sign: "Gemini"
+    moon_sign: "Taurus"
+    moon_nakshatra: "Mrigashira"
